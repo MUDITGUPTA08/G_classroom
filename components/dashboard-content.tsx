@@ -123,6 +123,7 @@ export function DashboardContent() {
               // For each student, count missing submissions
               for (const enrollment of enrollments) {
                 const studentId = enrollment.student_id
+                const profile = enrollment.profiles as any
 
                 // Get assignments for classes the student is enrolled in
                 const { data: studentClassIds } = await supabase
@@ -150,8 +151,8 @@ export function DashboardContent() {
 
                   if (missingCount >= 3) {
                     atRiskData.push({
-                      name: enrollment.profiles.full_name,
-                      email: enrollment.profiles.email,
+                      name: profile.full_name,
+                      email: profile.email,
                       missingCount,
                     })
                   }
