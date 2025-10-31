@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createClient } from "@/lib/supabase/client"
 import type { Tables } from "@/lib/supabase/types"
+import { FileList, type FileItem } from "@/components/file-list"
 
 type Profile = Tables<"profiles">
 
@@ -35,6 +36,8 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
   const [grading, setGrading] = useState(false)
   const [grade, setGrade] = useState("")
   const [feedback, setFeedback] = useState("")
+  const [submissionFiles, setSubmissionFiles] = useState<FileItem[]>([])
+  const [deadlineOverride, setDeadlineOverride] = useState("")
 
   useEffect(() => {
     loadSubmission()
@@ -69,6 +72,26 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
     setGrade(submissionData?.grade?.toString() || "")
     setFeedback(submissionData?.feedback || "")
 
+    // Set deadline override if exists, convert to datetime-local format
+    if (submissionData?.deadline_override) {
+      const date = new Date(submissionData.deadline_override)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      setDeadlineOverride(`${year}-${month}-${day}T${hours}:${minutes}`)
+    }
+
+    // Get submission files
+    const { data: filesData } = await supabase
+      .from("submission_files")
+      .select("*")
+      .eq("submission_id", id)
+      .order("created_at", { ascending: false })
+
+    setSubmissionFiles(filesData || [])
+
     setLoading(false)
   }
 
@@ -78,14 +101,21 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
 
     const supabase = createClient()
 
+    const updateData: any = {
+      grade: parseInt(grade),
+      feedback,
+      graded_at: new Date().toISOString(),
+      status: "graded",
+    }
+
+    // Add deadline override if provided
+    if (deadlineOverride) {
+      updateData.deadline_override = new Date(deadlineOverride).toISOString()
+    }
+
     const { error } = await supabase
       .from("submissions")
-      .update({
-        grade: parseInt(grade),
-        feedback,
-        graded_at: new Date().toISOString(),
-        status: "graded",
-      })
+      .update(updateData)
       .eq("id", id)
 
     if (!error) {
@@ -153,7 +183,14 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
         </header>
         <div className="flex flex-1 flex-col gap-4 p-4 pt-6 max-w-4xl mx-auto w-full">
           <div>
-            <h1 className="text-3xl font-bold">{submission.assignments?.title}</h1>
+            <div className="flex items-center gap-2">
+              <h1 className="text-3xl font-bold">{submission.assignments?.title}</h1>
+              {submission.is_late && (
+                <span className="inline-flex items-center text-sm bg-yellow-100 text-yellow-800 px-3 py-1 rounded-full">
+                  Late Submission
+                </span>
+              )}
+            </div>
             <p className="text-muted-foreground mt-1">
               {isTeacher ? `Submitted by ${submission.profiles?.full_name}` : submission.assignments?.classes?.name}
             </p>
@@ -197,8 +234,17 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
             <CardHeader>
               <CardTitle>Student Work</CardTitle>
             </CardHeader>
-            <CardContent>
-              <p className="whitespace-pre-wrap">{submission.content || "No content submitted"}</p>
+            <CardContent className="space-y-4">
+              <div>
+                <h4 className="font-medium mb-2">Written Submission</h4>
+                <p className="whitespace-pre-wrap">{submission.content || "No written content submitted"}</p>
+              </div>
+              {submissionFiles.length > 0 && (
+                <div>
+                  <h4 className="font-medium mb-2">Attached Files</h4>
+                  <FileList files={submissionFiles} />
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -233,6 +279,19 @@ export default function SubmissionDetailPage({ params }: { params: Promise<{ id:
                       onChange={(e) => setFeedback(e.target.value)}
                       disabled={grading}
                     />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="deadline-override">Custom Deadline (Optional)</Label>
+                    <Input
+                      id="deadline-override"
+                      type="datetime-local"
+                      value={deadlineOverride}
+                      onChange={(e) => setDeadlineOverride(e.target.value)}
+                      disabled={grading}
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Override the assignment deadline for this student only. Leave empty to use the original deadline.
+                    </p>
                   </div>
                   <Button type="submit" disabled={grading || !grade}>
                     {grading ? "Saving..." : submission.grade !== null && submission.grade !== undefined ? "Update Grade" : "Submit Grade"}

@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { createClient } from "@/lib/supabase/client"
+import { FileUpload } from "@/components/file-upload"
 
 export default function NewAssignmentPage() {
   const router = useRouter()
@@ -32,6 +33,7 @@ export default function NewAssignmentPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
   const [classes, setClasses] = useState<any[]>([])
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [formData, setFormData] = useState({
     title: "",
     description: "",
@@ -86,6 +88,34 @@ export default function NewAssignmentPage() {
         setError(insertError.message)
         setLoading(false)
         return
+      }
+
+      // Upload files to storage if any
+      if (selectedFiles.length > 0) {
+        for (const file of selectedFiles) {
+          const fileExt = file.name.split(".").pop()
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+          const storageFilePath = `${data.id}/${fileName}`
+          const fullFilePath = `assignment-attachments/${storageFilePath}`
+
+          const { error: uploadError } = await supabase.storage
+            .from("assignment-attachments")
+            .upload(storageFilePath, file)
+
+          if (uploadError) {
+            console.error("Error uploading file:", uploadError)
+            continue
+          }
+
+          // Save file metadata with full path (includes bucket name)
+          await supabase.from("assignment_attachments").insert({
+            assignment_id: data.id,
+            file_name: file.name,
+            file_path: fullFilePath,
+            file_size: file.size,
+            file_type: file.type,
+          })
+        }
       }
 
       router.push(`/dashboard/assignments/${data.id}`)
@@ -203,6 +233,15 @@ export default function NewAssignmentPage() {
                         disabled={loading}
                       />
                     </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Attach Files (Optional)</Label>
+                    <FileUpload
+                      onFilesSelected={setSelectedFiles}
+                      maxFiles={5}
+                      maxSizeMB={10}
+                      disabled={loading}
+                    />
                   </div>
                   <div className="flex gap-2 justify-end pt-4">
                     <Button

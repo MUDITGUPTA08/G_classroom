@@ -25,6 +25,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createClient } from "@/lib/supabase/client"
 import { FileText, Users, Clock, CheckCircle2 } from "lucide-react"
 import type { Tables } from "@/lib/supabase/types"
+import { FileUpload } from "@/components/file-upload"
+import { FileList, type FileItem } from "@/components/file-list"
 
 type Profile = Tables<"profiles">
 
@@ -39,6 +41,9 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [content, setContent] = useState("")
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
+  const [submissionFiles, setSubmissionFiles] = useState<FileItem[]>([])
+  const [assignmentAttachments, setAssignmentAttachments] = useState<FileItem[]>([])
 
   useEffect(() => {
     loadAssignmentData()
@@ -65,7 +70,7 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
     // Get assignment details
     const { data: assignmentData } = await supabase
       .from("assignments")
-      .select("*, classes(name, teacher_id)")
+      .select("*, classes(name, teacher_id, allow_late_submissions)")
       .eq("id", id)
       .single()
 
@@ -73,6 +78,15 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
 
     if (assignmentData) {
       setClassData(assignmentData.classes)
+
+      // Get assignment attachments
+      const { data: attachmentsData } = await supabase
+        .from("assignment_attachments")
+        .select("*")
+        .eq("assignment_id", id)
+        .order("created_at", { ascending: false })
+
+      setAssignmentAttachments(attachmentsData || [])
 
       if (profileData?.role === "student") {
         // Get student's submission
@@ -85,6 +99,17 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
 
         setSubmission(submissionData)
         setContent(submissionData?.content || "")
+
+        // Get submission files if submission exists
+        if (submissionData) {
+          const { data: filesData } = await supabase
+            .from("submission_files")
+            .select("*")
+            .eq("submission_id", submissionData.id)
+            .order("created_at", { ascending: false })
+
+          setSubmissionFiles(filesData || [])
+        }
       } else if (profileData?.role === "teacher") {
         // Get all submissions for this assignment
         const { data: submissionsData } = await supabase
@@ -104,35 +129,129 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
     e.preventDefault()
     setSubmitting(true)
 
-    const supabase = createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    try {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
 
-    if (!user) return
+      if (!user) return
 
-    if (submission) {
-      // Update existing submission
-      const { error } = await supabase
-        .from("submissions")
-        .update({
-          content,
-          status: "submitted",
-          submitted_at: new Date().toISOString(),
-        })
-        .eq("id", submission.id)
-    } else {
-      // Create new submission
-      const { error } = await supabase
-        .from("submissions")
-        .insert({
-          assignment_id: id,
-          student_id: user.id,
-          content,
-          status: "submitted",
-        })
+      // Check if submission is late
+      const now = new Date()
+      const effectiveDueDate = submission?.deadline_override
+        ? new Date(submission.deadline_override)
+        : assignment.due_date
+          ? new Date(assignment.due_date)
+          : null
+
+      const isLate = effectiveDueDate ? now > effectiveDueDate : false
+
+      // Get class settings to check if late submissions are allowed
+      const { data: classSettings } = await supabase
+        .from("classes")
+        .select("allow_late_submissions")
+        .eq("id", assignment.class_id)
+        .single()
+
+      // Block submission if it's late and class doesn't allow late submissions
+      if (isLate && classSettings && !classSettings.allow_late_submissions) {
+        alert("This assignment is past due and no longer accepts submissions.")
+        setSubmitting(false)
+        return
+      }
+
+      let submissionId = submission?.id
+
+      if (submission) {
+        // Update existing submission
+        await supabase
+          .from("submissions")
+          .update({
+            content,
+            status: "submitted",
+            submitted_at: new Date().toISOString(),
+            is_late: isLate,
+          })
+          .eq("id", submission.id)
+      } else {
+        // Create new submission
+        const { data, error } = await supabase
+          .from("submissions")
+          .insert({
+            assignment_id: id,
+            student_id: user.id,
+            content,
+            status: "submitted",
+            is_late: isLate,
+          })
+          .select()
+          .single()
+
+        if (error) throw error
+        submissionId = data.id
+      }
+
+      // Upload files to storage
+      if (selectedFiles.length > 0 && submissionId) {
+        for (const file of selectedFiles) {
+          const fileExt = file.name.split(".").pop()
+          const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`
+          const storageFilePath = `${submissionId}/${fileName}`
+          const fullFilePath = `assignment-submissions/${storageFilePath}`
+
+          const { error: uploadError } = await supabase.storage
+            .from("assignment-submissions")
+            .upload(storageFilePath, file)
+
+          if (uploadError) {
+            console.error("Error uploading file:", uploadError)
+            continue
+          }
+
+          // Save file metadata with full path (includes bucket name)
+          await supabase.from("submission_files").insert({
+            submission_id: submissionId,
+            file_name: file.name,
+            file_path: fullFilePath,
+            file_size: file.size,
+            file_type: file.type,
+          })
+        }
+      }
+
+      setSelectedFiles([])
+      await loadAssignmentData()
+    } catch (error) {
+      console.error("Error submitting assignment:", error)
+      alert("Failed to submit assignment")
+    } finally {
+      setSubmitting(false)
     }
+  }
 
-    setSubmitting(false)
-    loadAssignmentData()
+  const handleDeleteSubmissionFile = async (fileId: string) => {
+    const supabase = createClient()
+    const file = submissionFiles.find((f) => f.id === fileId)
+    if (!file) return
+
+    // Extract the storage path (remove bucket name from full path)
+    const storageFilePath = file.file_path.split("/").slice(1).join("/")
+
+    // Delete from storage
+    const { error: storageError } = await supabase.storage
+      .from("assignment-submissions")
+      .remove([storageFilePath])
+
+    if (storageError) throw storageError
+
+    // Delete metadata
+    const { error: dbError } = await supabase
+      .from("submission_files")
+      .delete()
+      .eq("id", fileId)
+
+    if (dbError) throw dbError
+
+    await loadAssignmentData()
   }
 
   if (loading) {
@@ -216,6 +335,18 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
             </Card>
           )}
 
+          {assignmentAttachments.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Assignment Materials</CardTitle>
+                <CardDescription>Files provided by your teacher</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <FileList files={assignmentAttachments} />
+              </CardContent>
+            </Card>
+          )}
+
           {isTeacher ? (
             <Tabs defaultValue="submissions" className="w-full">
               <TabsList>
@@ -243,8 +374,15 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
                         <Card className="hover:shadow-md transition-shadow cursor-pointer">
                           <CardHeader>
                             <div className="flex items-center justify-between">
-                              <div>
-                                <CardTitle className="text-base">{sub.profiles?.full_name}</CardTitle>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2">
+                                  <CardTitle className="text-base">{sub.profiles?.full_name}</CardTitle>
+                                  {sub.is_late && (
+                                    <span className="inline-flex items-center text-xs bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full">
+                                      Late
+                                    </span>
+                                  )}
+                                </div>
                                 <CardDescription>{sub.profiles?.email}</CardDescription>
                               </div>
                               <div className="text-right">
@@ -287,6 +425,30 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
               </CardHeader>
               <CardContent>
                 <form onSubmit={handleSubmit} className="space-y-4">
+                  {submission?.is_late && (
+                    <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                      <h4 className="font-semibold text-sm mb-1 text-yellow-800">Late Submission</h4>
+                      <p className="text-sm text-yellow-700">This submission was marked as late.</p>
+                    </div>
+                  )}
+                  {isOverdue && !submission && classData && !classData.allow_late_submissions && (
+                    <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+                      <h4 className="font-semibold text-sm mb-1 text-red-800">Assignment Closed</h4>
+                      <p className="text-sm text-red-700">This assignment is past due and no longer accepts submissions.</p>
+                    </div>
+                  )}
+                  {isOverdue && !submission && classData && classData.allow_late_submissions && (
+                    <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg">
+                      <h4 className="font-semibold text-sm mb-1 text-yellow-800">Past Due Date</h4>
+                      <p className="text-sm text-yellow-700">This assignment is past due. Your submission will be marked as late.</p>
+                    </div>
+                  )}
+                  {submission?.deadline_override && (
+                    <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
+                      <h4 className="font-semibold text-sm mb-1">Custom Deadline</h4>
+                      <p className="text-sm">Your teacher has set a custom deadline: {new Date(submission.deadline_override).toLocaleString()}</p>
+                    </div>
+                  )}
                   {submission?.feedback && (
                     <div className="bg-blue-50 border border-blue-200 p-4 rounded-lg">
                       <h4 className="font-semibold text-sm mb-2">Teacher Feedback</h4>
@@ -304,8 +466,32 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
                       disabled={submitting || (submission?.grade !== null && submission?.grade !== undefined)}
                     />
                   </div>
+
+                  {submissionFiles.length > 0 && (
+                    <div className="space-y-2">
+                      <Label>Submitted Files</Label>
+                      <FileList
+                        files={submissionFiles}
+                        onDelete={handleDeleteSubmissionFile}
+                        canDelete={submission?.grade === null || submission?.grade === undefined}
+                      />
+                    </div>
+                  )}
+
+                  {(submission?.grade === null || submission?.grade === undefined) && (
+                    <div className="space-y-2">
+                      <Label>Attach Files (Optional)</Label>
+                      <FileUpload
+                        onFilesSelected={setSelectedFiles}
+                        maxFiles={5}
+                        maxSizeMB={10}
+                        disabled={submitting}
+                      />
+                    </div>
+                  )}
+
                   {submission?.grade === null || submission?.grade === undefined ? (
-                    <Button type="submit" disabled={submitting || !content}>
+                    <Button type="submit" disabled={submitting || (!content && selectedFiles.length === 0)}>
                       {submitting ? "Submitting..." : submission ? "Update Submission" : "Submit"}
                     </Button>
                   ) : (
