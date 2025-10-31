@@ -176,7 +176,7 @@ export default function AssignmentsPage() {
 
                 return (
                   <Link key={assignment.id} href={`/dashboard/assignments/${assignment.id}`}>
-                    <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                    <Card className="hover:shadow-md transition-shadow cursor-pointer mb-2">
                       <CardHeader>
                         <div className="flex items-start justify-between">
                           <div className="flex-1">

@@ -133,7 +133,7 @@ export default function SubmissionsPage() {
               </h2>
               {pendingSubmissions.map((submission) => (
                 <Link key={submission.id} href={`/dashboard/submissions/${submission.id}`}>
-                  <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                  <Card className="hover:shadow-md transition-shadow cursor-pointer mb-2">
                     <CardHeader>
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
