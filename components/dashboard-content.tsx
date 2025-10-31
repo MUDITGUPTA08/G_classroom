@@ -215,7 +215,7 @@ export function DashboardContent() {
             <div className="space-y-3">
               {recentClasses.map((cls) => (
                 <Link key={cls.id} href={`/dashboard/classes/${cls.id}`}>
-                  <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                  <div className="flex items-center justify-between p-3 mb-2 rounded-lg border hover:bg-muted/50 transition-colors">
                     <div>
                       <h3 className="font-medium">{cls.name}</h3>
                       <p className="text-sm text-muted-foreground">{cls.subject || "No subject"}</p>
