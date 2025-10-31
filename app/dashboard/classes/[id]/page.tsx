@@ -59,25 +59,28 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
 
     setProfile(profileData)
 
-    // Get class details using RLS-bypassing function
+    // Get class details directly (RLS is now disabled)
     const { data: classInfo, error: classError } = await supabase
-      .rpc('get_class_by_id', { p_class_id: id })
+      .from("classes")
+      .select("*")
+      .eq("id", id)
+      .single()
 
-    if (classError || !classInfo || classInfo.length === 0) {
+    if (classError || !classInfo) {
       console.error("Error loading class:", classError)
       setLoading(false)
       return
     }
 
-    setClassData(classInfo[0])
+    setClassData(classInfo)
 
-    // Get students enrolled in class (only for teachers)
-    if (profileData?.role === "teacher") {
-      const { data: studentsData } = await supabase
-        .rpc('get_class_students', { p_class_id: id })
+    // Get students enrolled in class
+    const { data: enrollments } = await supabase
+      .from("class_enrollments")
+      .select("profiles(*)")
+      .eq("class_id", id)
 
-      setStudents(studentsData || [])
-    }
+    setStudents(enrollments?.map((e: any) => e.profiles) || [])
 
     // Get assignments for class
     const { data: assignmentsData } = await supabase
