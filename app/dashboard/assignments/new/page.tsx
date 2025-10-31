@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { AppSidebar } from "@/components/app-sidebar"
 import {
@@ -25,7 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { createClient } from "@/lib/supabase/client"
 import { FileUpload } from "@/components/file-upload"
 
-export default function NewAssignmentPage() {
+function NewAssignmentContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const classId = searchParams.get("classId")
@@ -263,5 +263,13 @@ export default function NewAssignmentPage() {
         </div>
       </SidebarInset>
     </SidebarProvider>
+  )
+}
+
+export default function NewAssignmentPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+      <NewAssignmentContent />
+    </Suspense>
   )
 }
