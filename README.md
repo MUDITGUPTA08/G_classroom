@@ -124,6 +124,75 @@ A full-featured classroom management platform built with Next.js, Supabase, and 
 6. **Open your browser**
    Navigate to [http://localhost:3000](http://localhost:3000)
 
+## 🚀 Deployment to Vercel
+
+### Prerequisites
+- GitHub account with your repository pushed
+- Vercel account (sign up at [vercel.com](https://vercel.com))
+- Supabase project with all migrations applied
+
+### Deployment Steps
+
+1. **Push your code to GitHub**
+   ```bash
+   git add .
+   git commit -m "Prepare for Vercel deployment"
+   git push origin main
+   ```
+
+2. **Import Project to Vercel**
+   - Go to [vercel.com/new](https://vercel.com/new)
+   - Click "Import Project"
+   - Select your GitHub repository
+   - Vercel will automatically detect Next.js
+
+3. **Configure Environment Variables**
+   In the Vercel project settings, add these environment variables:
+
+   ```env
+   NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   ```
+
+   Get these values from your Supabase project:
+   - Go to [app.supabase.com](https://app.supabase.com)
+   - Select your project
+   - Go to Settings → API
+   - Copy "Project URL" and "anon public" key
+
+4. **Deploy**
+   - Click "Deploy"
+   - Vercel will build and deploy your application
+   - You'll get a production URL (e.g., `your-project.vercel.app`)
+
+5. **Verify Deployment**
+   - Visit your deployed URL
+   - Test authentication (sign up/login)
+   - Create a class and upload files
+   - Verify Supabase connection is working
+
+### Post-Deployment Configuration
+
+**Update Supabase Authentication URLs**:
+1. Go to your Supabase project
+2. Navigate to Authentication → URL Configuration
+3. Add your Vercel URL to:
+   - Site URL: `https://your-project.vercel.app`
+   - Redirect URLs: `https://your-project.vercel.app/**`
+
+**Custom Domain (Optional)**:
+1. In Vercel project settings, go to "Domains"
+2. Add your custom domain
+3. Update DNS records as instructed
+4. Update Supabase redirect URLs with your custom domain
+
+### Troubleshooting
+
+- **Build Errors**: Check Vercel build logs for missing dependencies
+- **Database Connection**: Verify environment variables are set correctly
+- **File Upload Issues**: Ensure Supabase Storage buckets are public
+- **Authentication Errors**: Check Supabase redirect URLs match your deployment URL
+
 ## 📊 Database Schema
 
 ### Core Tables
