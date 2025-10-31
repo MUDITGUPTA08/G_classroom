@@ -191,6 +191,7 @@ export function DashboardContent() {
             assignments: assignmentsResult.count || 0,
             submissions: submissionsResult.count || 0,
             students: 0,
+            averageScore: 0,
           })
 
           setRecentClasses(recentClassesData)
