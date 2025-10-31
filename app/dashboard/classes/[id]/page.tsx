@@ -235,7 +235,7 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
                 <div className="space-y-3">
                   {assignments.map((assignment) => (
                     <Link key={assignment.id} href={`/dashboard/assignments/${assignment.id}`}>
-                      <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                      <Card className="hover:shadow-md transition-shadow cursor-pointer mb-2">
                         <CardHeader>
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
