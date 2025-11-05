@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { createClient } from "@/lib/supabase/client"
-import { FileText, Users, Clock, CheckCircle2 } from "lucide-react"
+import { FileText, Users, Clock, CheckCircle2, Pencil, Trash2 } from "lucide-react"
 import type { Tables } from "@/lib/supabase/types"
 import { FileUpload } from "@/components/file-upload"
 import { FileList, type FileItem } from "@/components/file-list"
@@ -254,6 +254,27 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
     await loadAssignmentData()
   }
 
+  async function handleDeleteAssignment() {
+    if (!confirm(`Are you sure you want to delete the assignment "${assignment.title}"? This will also delete all submissions. This action cannot be undone.`)) {
+      return
+    }
+
+    const supabase = createClient()
+    try {
+      const { error } = await supabase
+        .from("assignments")
+        .delete()
+        .eq("id", id)
+
+      if (error) throw error
+
+      router.push("/dashboard/assignments")
+    } catch (error) {
+      console.error("Error deleting assignment:", error)
+      alert("Failed to delete assignment")
+    }
+  }
+
   if (loading) {
     return (
       <SidebarProvider>
@@ -314,13 +335,29 @@ export default function AssignmentDetailPage({ params }: { params: Promise<{ id:
               <h1 className="text-3xl font-bold">{assignment.title}</h1>
               <p className="text-muted-foreground mt-1">{classData?.name || "Unknown Class"}</p>
             </div>
-            <div className="text-right">
-              <div className="text-2xl font-bold">{assignment.points} points</div>
-              {assignment.due_date && (
-                <div className={`text-sm ${isOverdue ? "text-red-500" : "text-muted-foreground"}`}>
-                  Due: {new Date(assignment.due_date).toLocaleString()}
+            <div className="flex items-start gap-4">
+              {isTeacher && (
+                <div className="flex gap-2">
+                  <Link href={`/dashboard/assignments/${id}/edit`}>
+                    <Button variant="outline" size="sm">
+                      <Pencil className="h-4 w-4 mr-2" />
+                      Edit
+                    </Button>
+                  </Link>
+                  <Button variant="outline" size="sm" onClick={handleDeleteAssignment}>
+                    <Trash2 className="h-4 w-4 mr-2 text-red-500" />
+                    Delete
+                  </Button>
                 </div>
               )}
+              <div className="text-right">
+                <div className="text-2xl font-bold">{assignment.points} points</div>
+                {assignment.due_date && (
+                  <div className={`text-sm ${isOverdue ? "text-red-500" : "text-muted-foreground"}`}>
+                    Due: {new Date(assignment.due_date).toLocaleString()}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

@@ -24,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createClient } from "@/lib/supabase/client"
-import { Plus, Users, FileText, Copy, CheckCircle2, FolderOpen } from "lucide-react"
+import { Plus, Users, FileText, Copy, CheckCircle2, FolderOpen, Pencil } from "lucide-react"
 import type { Tables } from "@/lib/supabase/types"
 import { FileUpload } from "@/components/file-upload"
 import { FileList, type FileItem } from "@/components/file-list"
@@ -260,6 +260,14 @@ export default function ClassDetailPage({ params }: { params: Promise<{ id: stri
               <p className="text-muted-foreground mt-1">{classData.subject || "No subject"}</p>
             </div>
             <div className="flex items-center gap-2">
+              {isTeacher && (
+                <Link href={`/dashboard/classes/${id}/edit`}>
+                  <Button variant="outline" size="sm">
+                    <Pencil className="h-4 w-4 mr-2" />
+                    Edit Class
+                  </Button>
+                </Link>
+              )}
               <div className="flex items-center gap-2 bg-muted px-4 py-2 rounded-lg">
                 <span className="text-sm font-medium">Class Code:</span>
                 <code className="text-lg font-mono font-bold">{classData.class_code}</code>
