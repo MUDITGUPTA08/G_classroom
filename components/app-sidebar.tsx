@@ -10,6 +10,9 @@ import {
   Users,
   Settings,
   Plus,
+  Shield,
+  BarChart3,
+  ClipboardList,
 } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
@@ -123,6 +126,65 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     },
   ]
 
+  const adminNav = [
+    {
+      title: "Dashboard",
+      url: "/dashboard",
+      icon: Home,
+      isActive: true,
+    },
+    {
+      title: "Admin Panel",
+      url: "/admin",
+      icon: Shield,
+      items: [
+        {
+          title: "Users",
+          url: "/admin/users",
+        },
+        {
+          title: "Teachers",
+          url: "/admin/teachers",
+        },
+        {
+          title: "Students",
+          url: "/admin/students",
+        },
+        {
+          title: "Classes",
+          url: "/admin/classes",
+        },
+        {
+          title: "Analytics",
+          url: "/admin/analytics",
+        },
+        {
+          title: "Audit Logs",
+          url: "/admin/audit-logs",
+        },
+        {
+          title: "Settings",
+          url: "/admin/settings",
+        },
+      ],
+    },
+    {
+      title: "All Classes",
+      url: "/dashboard/classes",
+      icon: GraduationCap,
+    },
+    {
+      title: "All Assignments",
+      url: "/dashboard/assignments",
+      icon: FileText,
+    },
+    {
+      title: "All Submissions",
+      url: "/dashboard/submissions",
+      icon: CheckSquare,
+    },
+  ]
+
   const navSecondary = [
     {
       title: "Settings",
@@ -131,7 +193,10 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
     },
   ]
 
-  const navItems = profile?.role === "teacher" ? teacherNav : studentNav
+  const navItems =
+    profile?.role === "admin" ? adminNav :
+    profile?.role === "teacher" ? teacherNav :
+    studentNav
 
   return (
     <Sidebar variant="inset" {...props}>
